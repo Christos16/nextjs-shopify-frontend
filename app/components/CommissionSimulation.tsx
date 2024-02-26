@@ -19,6 +19,8 @@ const CommissionSimulation = () => {
           "http://localhost:9000/api/staff-members"
         );
         setStaffMembers(response.data);
+
+        setSelectedStaffMember(response.data[0]._id);
       } catch (error) {
         console.error("Error fetching staff members:", error);
       }
@@ -54,7 +56,10 @@ const CommissionSimulation = () => {
     ([day, commission]) => {
       const commissionDate = new Date(startDate);
       commissionDate.setDate(startDate.getDate() + parseInt(day));
-      return [commissionDate.toDateString(), commission.sumCommissions];
+      return [
+        commissionDate.toDateString(),
+        commission.sumCommissions?.toFixed(2),
+      ];
     }
   );
 

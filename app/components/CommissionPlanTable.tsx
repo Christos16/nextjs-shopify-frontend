@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   DataTable,
@@ -10,6 +10,7 @@ import {
 } from "@shopify/polaris";
 import { debounce } from "lodash";
 import axios from "axios";
+import CommissionInput from "./CommissionInput";
 
 interface Product {
   _id: string;
@@ -22,6 +23,7 @@ interface Product {
 
 const CommissionPlanTable: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const productsRef = useRef<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
     new Set()
   );
@@ -38,6 +40,11 @@ const CommissionPlanTable: React.FC = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    productsRef.current = products;
+    console.log(products, "PRODUCTS");
+  }, [products]);
 
   const fetchProducts = async () => {
     try {
@@ -115,7 +122,6 @@ const CommissionPlanTable: React.FC = () => {
         alert("Select at least two products to apply commission.");
         return;
       }
-
       if (commissionPercentValue === "") {
         alert("You must add a percent.");
         return;
@@ -133,6 +139,7 @@ const CommissionPlanTable: React.FC = () => {
       setProducts(response.data);
       // Clear selected products
       setSelectedProducts(new Set());
+      setCommissionPercentValue("");
     } catch (error) {
       console.error("Error updating commission:", error);
     }
@@ -141,12 +148,14 @@ const CommissionPlanTable: React.FC = () => {
   const handleCommissionChange = useCallback(
     async (value: string, productId: string) => {
       const newCommissionPercent = parseInt(value);
+      // Accessing products from productsRef.current instead of state
+      const currentProducts = productsRef.current;
       try {
         await axios.put(
           `http://localhost:9000/api/products/${productId}/commission`,
           { commissionPercent: newCommissionPercent }
         );
-        const updatedProducts = products.map((product) =>
+        const updatedProducts = currentProducts?.map((product) =>
           product._id === productId
             ? { ...product, commissionPercent: newCommissionPercent }
             : product
@@ -163,7 +172,7 @@ const CommissionPlanTable: React.FC = () => {
   const debouncedSingleCommissionChange = useCallback(
     debounce(
       (value, productId) => handleCommissionChange(value, productId),
-      500
+      2000
     ),
     []
   );
@@ -217,6 +226,7 @@ const CommissionPlanTable: React.FC = () => {
           ]}
           rows={paginatedProducts.map((product) => [
             <Checkbox
+              key={`checkbox-${product._id}`}
               label="Select product"
               checked={selectedProducts.has(product._id)}
               onChange={() => handleProductSelection(product._id)}
@@ -224,21 +234,16 @@ const CommissionPlanTable: React.FC = () => {
             product.name,
             product.category,
             `$${product.price}`,
-            <TextField
-              label=""
-              value={
+            <CommissionInput
+              key={product._id}
+              initialCommissionPercent={
                 product.commissionPercent !== undefined
-                  ? product.commissionPercent?.toString()
-                  : ""
+                  ? product.commissionPercent
+                  : 0
               }
-              onChange={(value) =>
-                debouncedSingleCommissionChange(value, product._id)
-              }
-              type="number"
-              min={0}
-              max={100}
-              suffix="%"
-              autoComplete="off"
+              productId={product._id}
+              allProducts={products}
+              onCommissionChange={debouncedSingleCommissionChange}
             />,
           ])}
           sortable={[false, true, true, true]}
